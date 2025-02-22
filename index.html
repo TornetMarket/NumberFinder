@@ -197,9 +197,9 @@
   <script>
     let level = 1;
     let progress = 0;
-    const progressIncrement = 10; // 10% per correct selection (10 correct picks needed)
-    // Levels 1-12 increase grid size; level 13 means game is beaten.
-    const maxLevelForGrid = 12;  
+    const progressIncrement = 10; // 10% per correct selection (need 10 correct picks per level)
+    // Levels 1-12 increase grid size; level 13 means game is complete.
+    const maxLevelForGrid = 12;
 
     const gridElement = document.getElementById("grid");
     const progressBar = document.getElementById("progressBar");
@@ -209,7 +209,16 @@
     const audio = document.getElementById("gameAudio");
     const flashOverlay = document.getElementById("flashOverlay");
 
-    let currentTarget; // Holds the "different" number for current grid.
+    let currentTarget; // holds the target number for the current grid
+
+    // Helper: returns a random double-digit number (10-99) that is not equal to 'exclude'
+    function getRandomDoubleDigit(exclude) {
+      let num;
+      do {
+        num = Math.floor(Math.random() * 90) + 10;
+      } while (num === exclude);
+      return num;
+    }
 
     // Calculate grid size based on current level.
     // Base grid: 8x8 for levels 1-2, then add a row/column every 2 levels up to 13x13.
@@ -224,37 +233,39 @@
       gridElement.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
       const totalCells = gridSize * gridSize;
       
-      // Pick a random base number between 1 and 9.
-      let baseNum = Math.floor(Math.random() * 9) + 1;
-      // Choose a slightly different number.
-      let diffNum = (baseNum === 9) ? baseNum - 1 : baseNum + 1;
-      currentTarget = diffNum;
-      // Update level indicator to show level and target number.
-      levelIndicator.textContent = "Level: " + level + " | Target: " + diffNum;
+      // Choose a random target number (double-digit)
+      let target = Math.floor(Math.random() * 90) + 10;
+      currentTarget = target;
+      // Update level indicator to show the target number.
+      levelIndicator.textContent = "Level: " + level + " | Target: " + target;
       
-      // Randomly choose one cell to hold the different number.
-      const diffIndex = Math.floor(Math.random() * totalCells);
+      // Randomly choose one cell to display the target.
+      const targetIndex = Math.floor(Math.random() * totalCells);
       
       for (let i = 0; i < totalCells; i++) {
         const cell = document.createElement("div");
         cell.classList.add("cell");
-        cell.textContent = (i === diffIndex) ? diffNum : baseNum;
-        if (i === diffIndex) {
-          cell.setAttribute("data-diff", "true");
+        if (i === targetIndex) {
+          cell.textContent = target;
+          cell.setAttribute("data-target", "true");
+        } else {
+          // Generate a random double-digit number that is not equal to the target.
+          let num = getRandomDoubleDigit(target);
+          cell.textContent = num;
         }
         cell.addEventListener("click", cellClicked);
         gridElement.appendChild(cell);
       }
     }
 
-    // Flash the screen depending on type ("correct" or "wrong").
+    // Flash the screen for 2 seconds based on the type of click.
     function flashScreen(type) {
+      flashOverlay.style.display = "block";
       if (type === "correct") {
         flashOverlay.className = "flash-correct";
       } else if (type === "wrong") {
         flashOverlay.className = "flash-wrong";
       }
-      // Remove flash after 2 seconds.
       setTimeout(() => {
         flashOverlay.className = "";
         flashOverlay.style.display = "none";
@@ -263,14 +274,14 @@
 
     // Handle cell clicks.
     function cellClicked(e) {
-      if (e.target.getAttribute("data-diff") === "true") {
+      if (e.target.getAttribute("data-target") === "true") {
         // Correct selection.
         flashScreen("correct");
         progress += progressIncrement;
         if (progress >= 100) {
           progress = 0;
           level++;
-          // If level goes beyond maxLevelForGrid, game is complete.
+          // If level goes beyond maxLevelForGrid, the game is complete.
           if (level > maxLevelForGrid) {
             updateProgressBar();
             showGameCompleteModal();
@@ -290,7 +301,7 @@
       progressBar.style.width = progress + "%";
     }
 
-    // Show the game-complete modal.
+    // Show game-complete modal.
     function showGameCompleteModal() {
       modal.innerHTML = `
         <div class="modal-content">
@@ -309,7 +320,6 @@
       progress = 0;
       updateProgressBar();
       generateGrid();
-      // Start the background audio.
       audio.play();
       // Restore original modal content.
       modal.innerHTML = `
