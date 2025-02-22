@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brain Stimulation Game</title>
+  <style>
+    /* Basic reset and styling */
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    
+    .container {
+      width: 100%;
+      max-width: 600px;
+      background: #fff;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      position: relative;
+      z-index: 1;
+    }
+    
+    h1 {
+      text-align: center;
+      margin-top: 0;
+    }
+    
+    /* Progress bar styles */
+    #progressContainer {
+      width: 100%;
+      background: #ddd;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 15px;
+    }
+    
+    #progressBar {
+      width: 0%;
+      height: 20px;
+      background: #4caf50;
+      transition: width 0.3s;
+    }
+    
+    #levelIndicator {
+      text-align: center;
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+    
+    /* Grid styles */
+    .grid {
+      display: grid;
+      grid-gap: 5px;
+    }
+    
+    .cell {
+      background: #fafafa;
+      border: 1px solid #ccc;
+      padding: 20px;
+      text-align: center;
+      font-size: 1.5em;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.3s;
+    }
+    
+    .cell:hover {
+      background: #e0e0e0;
+    }
+    
+    /* Responsive tweaks */
+    @media (max-width: 600px) {
+      .cell {
+        padding: 15px;
+        font-size: 1.2em;
+      }
+    }
+    
+    /* Modal overlay styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    
+    .modal-content {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+      max-width: 90%;
+    }
+    
+    .modal-content h1 {
+      margin-top: 0;
+    }
+    
+    .modal-content button {
+      padding: 10px 20px;
+      font-size: 1em;
+      margin-top: 15px;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      background: #4caf50;
+      color: #fff;
+      transition: background 0.3s;
+    }
+    
+    .modal-content button:hover {
+      background: #43a047;
+    }
+  </style>
+</head>
+<body>
+  <!-- Modal overlay (shown on load and when game completes) -->
+  <div id="modal" class="modal-overlay">
+    <div class="modal-content">
+      <h1>Brain Stimulation Game</h1>
+      <h2>Dedicated To Rosa</h2>
+      <p>Developed By ; UnknownBlackHat</p>
+      <button id="startBtn">Start Game</button>
+    </div>
+  </div>
+  
+  <div class="container">
+    <h1>Number Finding Game</h1>
+    <div id="progressContainer">
+      <div id="progressBar"></div>
+    </div>
+    <div id="levelIndicator">Level: 1</div>
+    <div id="grid" class="grid"></div>
+  </div>
+
+  <!-- Audio element -->
+  <audio id="gameAudio" src="intro.mp3" loop></audio>
+  
+  <script>
+    let level = 1;
+    let progress = 0;
+    // Slower progress: 10% per correct selection (10 correct picks per level).
+    const progressIncrement = 10;
+    // Levels 1-12 increase grid size; level 13 means game beaten.
+    const maxLevelForGrid = 12;  
+
+    const gridElement = document.getElementById("grid");
+    const progressBar = document.getElementById("progressBar");
+    const levelIndicator = document.getElementById("levelIndicator");
+    const modal = document.getElementById("modal");
+    const startBtn = document.getElementById("startBtn");
+    const audio = document.getElementById("gameAudio");
+
+    // Calculate grid size based on current level.
+    // Base grid: 8x8 for levels 1-2, then add a row/column every 2 levels up to 13x13.
+    function getGridSize() {
+      return Math.min(8 + Math.floor((level - 1) / 2), 13);
+    }
+
+    // Generate grid based on current level.
+    function generateGrid() {
+      gridElement.innerHTML = "";
+      const gridSize = getGridSize();
+      gridElement.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+      const totalCells = gridSize * gridSize;
+      
+      // Pick a random base number between 1 and 9.
+      let baseNum = Math.floor(Math.random() * 9) + 1;
+      // Choose a slightly different number.
+      let diffNum = (baseNum === 9) ? baseNum - 1 : baseNum + 1;
+      // Randomly choose one cell to hold the different number.
+      const diffIndex = Math.floor(Math.random() * totalCells);
+      
+      for (let i = 0; i < totalCells; i++) {
+        const cell = document.createElement("div");
+        cell.classList.add("cell");
+        cell.textContent = (i === diffIndex) ? diffNum : baseNum;
+        if (i === diffIndex) {
+          cell.setAttribute("data-diff", "true");
+        }
+        cell.addEventListener("click", cellClicked);
+        gridElement.appendChild(cell);
+      }
+    }
+
+    // Handle cell clicks.
+    function cellClicked(e) {
+      if (e.target.getAttribute("data-diff") === "true") {
+        // Correct selection.
+        progress += progressIncrement;
+        if (progress >= 100) {
+          progress = 0;
+          level++;
+          // If level goes beyond maxLevelForGrid, the game is beaten.
+          if (level > maxLevelForGrid) {
+            updateProgressBar();
+            showGameCompleteModal();
+            return;
+          }
+          updateLevelIndicator();
+        }
+        updateProgressBar();
+        generateGrid();
+      } else {
+        // Optional: provide feedback for incorrect selections.
+      }
+    }
+
+    // Update progress bar width.
+    function updateProgressBar() {
+      progressBar.style.width = progress + "%";
+    }
+
+    // Update the level display.
+    function updateLevelIndicator() {
+      levelIndicator.textContent = "Level: " + level;
+    }
+
+    // Show the game-complete modal.
+    function showGameCompleteModal() {
+      modal.innerHTML = `
+        <div class="modal-content">
+          <h1>Congratulations!</h1>
+          <p>You beat the game!</p>
+          <button id="restartBtn">Restart Game</button>
+        </div>
+      `;
+      modal.style.display = "flex";
+      document.getElementById("restartBtn").addEventListener("click", restartGame);
+    }
+
+    // Restart the game from level 1.
+    function restartGame() {
+      level = 1;
+      progress = 0;
+      updateLevelIndicator();
+      updateProgressBar();
+      generateGrid();
+      // Start the background audio.
+      audio.play();
+      // Restore original modal content.
+      modal.innerHTML = `
+        <div class="modal-content">
+          <h1>Brain Stimulation Game</h1>
+          <h2>Dedicated To Rosa</h2>
+          <p>Developed By ; UnknownBlackHat</p>
+          <button id="startBtn">Start Game</button>
+        </div>
+      `;
+      modal.style.display = "none";
+      document.getElementById("startBtn").addEventListener("click", () => {
+        modal.style.display = "none";
+        audio.play();
+        generateGrid();
+      });
+    }
+
+    // When the page loads, attach the Start Game button event.
+    startBtn.addEventListener("click", () => {
+      modal.style.display = "none";
+      // Start background audio.
+      audio.play();
+      generateGrid();
+    });
+  </script>
+</body>
+</html>
